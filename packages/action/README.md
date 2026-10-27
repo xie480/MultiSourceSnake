@@ -1,13 +1,26 @@
-# @snk/action
+# `@snk/action`
 
-Contains the github action code.
+The GitHub Docker Action builds its container from the fork's root `Dockerfile`, so a workflow that references this repository runs the fork's code rather than the original prebuilt image.
 
-## Implementation
+## Inputs
 
-### Docker
+| Input           | Required | Default | Description                                                                      |
+| --------------- | -------- | ------- | -------------------------------------------------------------------------------- |
+| `GITHUB_USER`   | Yes      | —       | GitHub account to query                                                          |
+| `GITHUB_TOKEN`  | Yes      | —       | GraphQL token; use a PAT with `read:user` to include private contribution counts |
+| `GITEE_USER`    | No       | —       | Gitee account; omitted to skip Gitee                                             |
+| `GITEE_TOKEN`   | No       | —       | Optional Gitee API token                                                         |
+| `GITCODE_USER`  | No       | —       | GitCode account; omitted to skip GitCode                                         |
+| `GITCODE_TOKEN` | No       | —       | Required when `GITCODE_USER` is set                                              |
+| `WINDOW_DAYS`   | No       | `365`   | Rolling UTC window, from 1 to 366 days                                           |
+| `outputs`       | Yes      | —       | Newline-separated SVG/GIF output paths                                           |
 
-Because the gif generation requires some native libs, we cannot use a node.js action.
+The heatmap and totals count commits from all enabled platforms. GIF frames display the rolling-window total and how many commits the snake has eaten. A GitHub Profile README can display the generated static image, but visitors cannot switch its year interactively. See the repository root README for a complete profile workflow.
 
-Use a docker action instead, the image is created from the [Dockerfile](../../Dockerfile).
+## Build
 
-It's published to [dockerhub](https://hub.docker.com/r/platane/snk) which makes for faster build ( compare to building the image when the action runs )
+```sh
+yarn install
+yarn type
+yarn build:action
+```
