@@ -92,9 +92,9 @@ GIF 每一帧在画布顶部留白区显示 `Last 365 days: N commits | Eaten: E
 
 ## 8. 当前验证状态
 
-- Jest：排除依赖原生 `canvas.node` 的 `packages/gif-creator/__tests__/createGif.spec.ts` 后，18 个测试套件、84 个测试通过。
+- Jest：排除依赖原生 `canvas.node` 的 `packages/gif-creator/__tests__/createGif.spec.ts` 后，18 个测试套件、85 个测试通过。
 - `yarn type` 通过；在 `packages/action` 下执行 `yarn build`，ncc Action bundle 构建通过。
-- 完整 GIF 集成测试受本机环境阻塞：Windows Node 22 预编译下载遇到 TLS 连接中断，node-gyp 回退后因机器没有 Visual Studio C++ Build Tools 而失败。Docker 镜像未构建验证。
+- 完整 GIF 集成测试受本机环境阻塞：Windows Node 22 预编译下载遇到 TLS 连接中断，node-gyp 回退后因机器没有 Visual Studio C++ Build Tools 而失败。Docker 镜像构建因 Docker Desktop Linux Engine 未启动，无法连接 daemon。
 - 未使用真实 GitHub/Gitee/GitCode token 调用外部 API；目标账号上的分页、权限和数据覆盖仍待 smoke test。
 
 ## 9. 主流落地模式调研
