@@ -1,24 +1,34 @@
 name: "generate-multi-source-snake-animation"
-description: "Can generate multisource snake animation from both GitHub and Gitee"
+description: "Generate a multi-source GitHub, Gitee, and GitCode commit snake"
 author: "ZQ"
 
 runs:
   using: docker
-  image: docker://pray0/multi-source-snake:v1.6
+  image: Dockerfile
 
 inputs:
   GITHUB_USER:
     description: "GitHub user name"
     required: true
   GITHUB_TOKEN:
-    description: "GitHub token used to fetch the contribution calendar. Default to the action token if empty."
+    description: "GitHub GraphQL token; use a token with read:user to include private contribution counts."
     required: true
   GITEE_USER:
     description: "Gitee user name"
-    required: true
+    required: false
   GITEE_TOKEN:
     description: "Gitee token used to access Gitee API."
-    required: true
+    required: false
+  GITCODE_USER:
+    description: "GitCode user name"
+    required: false
+  GITCODE_TOKEN:
+    description: "GitCode personal access token"
+    required: false
+  WINDOW_DAYS:
+    description: "Number of recent UTC days to display (1-366)"
+    required: false
+    default: "365"
   outputs:
     required: true
     description: |
