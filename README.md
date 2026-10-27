@@ -51,15 +51,64 @@ jobs:
           git push
 ```
 
-Replace `YOUR_FORK_OWNER` with the owner of your fork. In the profile repository’s **Settings → Secrets and variables → Actions**, add `GITCODE_TOKEN` and, if used, `GITEE_TOKEN`. Add `GITCODE_USER` and `GITEE_USER` as Actions Variables. GitHub public contribution data can use the built-in token shown above. To include private GitHub contribution counts, create a personal access token with `read:user`, save it as a secret such as `GH_CONTRIBUTION_TOKEN`, and change the workflow input to `GITHUB_TOKEN: ${{ secrets.GH_CONTRIBUTION_TOKEN }}`.
+### Configure repository secrets and variables
 
-Add this image reference to the profile `README.md`:
+Configure these values in the **profile repository that contains the workflow**, not in the `MultiSourceSnake` action repository. For example, the profile repository for `https://github.com/xie480` is `xie480/xie480`.
+
+GitHub’s current repository settings path is:
+
+1. Open the profile repository and click **Settings** in the repository tab bar. If the tab bar hides it, open the repository’s `…` menu and choose **Settings**.
+2. In the left sidebar, find **Security and quality**. Expand **Secrets and variables**, then click its **Actions** item.
+3. The page is titled **Actions secrets and variables**. At the top of the page, choose the **Secrets** or **Variables** tab. Use the **Repository** sections below; this workflow does not declare an environment.
+
+To add the GitCode token:
+
+1. Choose **Secrets**.
+2. Under **Repository secrets**, click **New repository secret**.
+3. Enter `GITCODE_TOKEN` in **Name**.
+4. Paste the personal access token you created on GitCode into **Secret**, then click **Add secret**.
+
+Do not put the token in a variable, workflow YAML, README, or chat. Add `GITEE_TOKEN` the same way only if you want to include Gitee and have a Gitee token. The token values are write-only in GitHub; the settings page shows the secret names but not their values.
+
+To add the GitCode account name:
+
+1. Return to **Actions secrets and variables** and choose **Variables**.
+2. Under **Repository variables**, click **New repository variable**.
+3. Enter `GITCODE_USER` in **Name** and your GitCode username in **Value**, then click **Add variable**.
+
+Add `GITEE_USER` in the same way if you want to include Gitee. Use each provider’s actual account name; it may differ from your GitHub username. GitHub currently validates variable names to use only letters, digits, and underscores, not to start with a digit, and not to start with `GITHUB_`; the names above follow those rules. The action skips a provider when its username is empty. GitHub’s own username is already supplied by `${{ github.repository_owner }}` in the workflow.
+
+| Provider | Repository variable | Repository secret | Required to enable that provider? |
+| --- | --- | --- | --- |
+| GitHub | None | None for public data; use the automatically provided `GITHUB_TOKEN` | Yes, `GITHUB_USER` and `GITHUB_TOKEN` are already wired in the workflow |
+| GitCode | `GITCODE_USER` | `GITCODE_TOKEN` | Both |
+| Gitee | `GITEE_USER` | `GITEE_TOKEN` is optional | `GITEE_USER`; the token is optional |
+
+Do not create a secret named `GITHUB_TOKEN`: GitHub Actions provides `${{ secrets.GITHUB_TOKEN }}` for each run. To include private GitHub contributions, create a separate personal access token with `read:user`, save it as `GH_CONTRIBUTION_TOKEN`, then change the workflow input to `GITHUB_TOKEN: ${{ secrets.GH_CONTRIBUTION_TOKEN }}`.
+
+### Add and run the workflow
+
+In the profile repository, create `.github/workflows/contribution-snake.yml` from **Code → Add file → Create new file**. If `.github/workflows` already exists, enter the full path in the filename field. Paste the workflow above and replace `YOUR_FORK_OWNER` with the owner of your action fork. Commit the new file to the profile repository’s default branch so GitHub can register the workflow.
+
+For a first run, open the repository’s **Actions** tab, select **Update multi-source contribution snake**, choose **Run workflow**, and start it on the branch containing the workflow file. The workflow has `workflow_dispatch` enabled for this manual run and `schedule` enabled for its daily refresh. On success, the action writes `dist/multisource-snake.gif` and the final step commits it to the profile repository.
+
+The workflow example uses `@v1`, which requires a `v1` tag to have been published in your action fork. Until then, use an existing branch as the action ref. For this repository’s current GitCode feature branch, the ref is:
+
+```yaml
+uses: xie480/MultiSourceSnake@yilena/gitcode-yearly-snake
+```
+
+After you publish a stable `v1` tag, switch the `uses` line to `xie480/MultiSourceSnake@v1` (or use your own fork owner if the action is forked again).
+
+### Display it in the profile README
+
+In the profile repository’s root `README.md`, keep the rest of your profile content and add this image where you want the animation to appear. If an older snake is already present, replace its image source to avoid showing two snakes:
 
 ```markdown
 ![Last 365 days of GitHub, Gitee, and GitCode commits; the animation shows commits eaten](./dist/multisource-snake.gif)
 ```
 
-The image is refreshed by the scheduled workflow. A README image cannot provide a visitor-controlled year selector; the GIF shows the latest rolling window.
+The path is relative to the profile repository root. The README image is refreshed by the scheduled workflow. A README image cannot provide a visitor-controlled year selector; this GIF always shows the latest rolling 365-day window.
 
 ## Action inputs
 
