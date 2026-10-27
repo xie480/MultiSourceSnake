@@ -11,6 +11,8 @@ import {
 } from "@snk/draw/drawWorld";
 import type { Point } from "@snk/types/point";
 import { step } from "@snk/solver/step";
+import { getHeadX, getHeadY } from "@snk/types/snake";
+import { formatCommitProgress, recordEatenCommits } from "./progress";
 import tmp from "tmp";
 import gifsicle from "gifsicle";
 // @ts-ignore
@@ -31,24 +33,39 @@ const withTmpDir = async <T>(
 };
 
 export type AnimationOptions = { frameDuration: number; step: number };
+export type CommitStats = {
+  totalCommits: number;
+  windowDays: number;
+  commitsByCell: Map<string, number>;
+};
 
 export const createGif = async (
   grid0: Grid,
   cells: Point[] | null,
   chain: Snake[],
   drawOptions: DrawOptions,
-  animationOptions: AnimationOptions
+  animationOptions: AnimationOptions,
+  commitStats?: CommitStats
 ) =>
   withTmpDir(async (dir) => {
     const { width, height } = getCanvasWorldSize(grid0, drawOptions);
+    const headerHeight = commitStats
+      ? Math.max(20, drawOptions.sizeCell + 4)
+      : 0;
 
-    const canvas = createCanvas(width, height);
+    const canvas = createCanvas(width, height + headerHeight);
     const ctx = canvas.getContext("2d") as any as CanvasRenderingContext2D;
 
     const grid = copyGrid(grid0);
     const stack: Color[] = [];
+    let eatenCommits = 0;
 
-    const encoder = new GIFEncoder(width, height, "neuquant", true);
+    const encoder = new GIFEncoder(
+      width,
+      height + headerHeight,
+      "neuquant",
+      true
+    );
     encoder.setRepeat(0);
     encoder.setDelay(animationOptions.frameDuration);
     encoder.start();
@@ -56,12 +73,22 @@ export const createGif = async (
     for (let i = 0; i < chain.length; i += 1) {
       const snake0 = chain[i];
       const snake1 = chain[Math.min(chain.length - 1, i + 1)];
-      step(grid, stack, snake0);
+      const eatenColor = step(grid, stack, snake0);
+      if (eatenColor && commitStats) {
+        eatenCommits = recordEatenCommits(
+          eatenCommits,
+          getHeadX(snake0),
+          getHeadY(snake0),
+          commitStats.commitsByCell
+        );
+      }
 
       for (let k = 0; k < animationOptions.step; k++) {
-        ctx.clearRect(0, 0, width, height);
+        ctx.clearRect(0, 0, width, height + headerHeight);
         ctx.fillStyle = "#fff";
-        ctx.fillRect(0, 0, width, height);
+        ctx.fillRect(0, 0, width, height + headerHeight);
+        ctx.save();
+        if (headerHeight > 0) ctx.translate(0, headerHeight);
         drawLerpWorld(
           ctx,
           grid,
@@ -72,6 +99,27 @@ export const createGif = async (
           k / animationOptions.step,
           drawOptions
         );
+        ctx.restore();
+
+        if (commitStats) {
+          ctx.save();
+          ctx.fillStyle = drawOptions.colorSnake;
+          ctx.font = `bold ${Math.max(
+            12,
+            drawOptions.sizeCell - 2
+          )}px sans-serif`;
+          ctx.textBaseline = "middle";
+          ctx.fillText(
+            formatCommitProgress(
+              commitStats.windowDays,
+              commitStats.totalCommits,
+              eatenCommits
+            ),
+            drawOptions.sizeCell,
+            headerHeight / 2
+          );
+          ctx.restore();
+        }
 
         encoder.addFrame(ctx);
       }

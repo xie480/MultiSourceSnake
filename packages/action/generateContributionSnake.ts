@@ -1,6 +1,16 @@
-import { getGithubUserContribution } from "@snk/github-user-contribution";
+import { getGithubUserCommitContributions } from "@snk/github-user-contribution";
 import { getGiteeUserContribution } from "@snk/gitee-user-contribution";
+import { getGitCodeUserContribution } from "@snk/gitcode-user-contribution";
 import { userContributionToGrid } from "./userContributionToGrid";
+import {
+  commitCountsByCell,
+  mergeDailyCommitCounts,
+  totalCommitCount,
+} from "./contributions";
+import {
+  createContributionWindow,
+  type DailyCommitCount,
+} from "@snk/types/contribution";
 import { getBestRoute } from "@snk/solver/getBestRoute";
 import { snake4 } from "@snk/types/__fixtures__/snake";
 import { getPathToPose } from "@snk/solver/getPathToPose";
@@ -10,53 +20,62 @@ import type { AnimationOptions } from "@snk/gif-creator";
 export const generateContributionSnake = async (
   githubUserName: string,
   giteeUserName: string,
+  gitcodeUserName: string,
   outputs: ({
     format: "svg" | "gif";
     drawOptions: DrawOptions;
     animationOptions: AnimationOptions;
   } | null)[],
-  options: { githubToken: string; giteeToken: string }
+  options: {
+    githubToken: string;
+    giteeToken?: string;
+    gitcodeToken?: string;
+    windowDays?: number;
+    now?: Date;
+  }
 ) => {
-  console.log("🚀 Outputs:", outputs);
-  console.log("🚀 giteeUsername:", giteeUserName);
-  console.log("🚀 githubUsername:", githubUserName);
+  const window = createContributionWindow(
+    options.windowDays ?? 365,
+    options.now
+  );
+  if (gitcodeUserName && !options.gitcodeToken) {
+    throw new Error(
+      "GitCode token is required when GITCODE_USER is configured"
+    );
+  }
+  const dailySources: DailyCommitCount[][] = [];
 
-  // 可能是这里 await 的问题
-  console.log("🎣 fetching github user contribution");
-  const githubCells = await getGithubUserContribution(githubUserName, options);
+  console.log("🎣 fetching GitHub commit contributions");
+  dailySources.push(
+    await getGithubUserCommitContributions(githubUserName, {
+      githubToken: options.githubToken,
+      window,
+    })
+  );
 
-  console.log("🎣 fetching gitee user contribution");
-  const giteeCells = await getGiteeUserContribution(giteeUserName, options);
+  if (giteeUserName) {
+    console.log("🎣 fetching Gitee push contributions");
+    dailySources.push(
+      await getGiteeUserContribution(giteeUserName, {
+        giteeToken: options.giteeToken,
+        window,
+      })
+    );
+  }
 
-  const cells = githubCells;
-  console.log(giteeCells.length);
-  console.log(githubCells.length);
+  if (gitcodeUserName) {
+    console.log("🎣 fetching GitCode push contributions");
+    dailySources.push(
+      await getGitCodeUserContribution(gitcodeUserName, {
+        gitcodeToken: options.gitcodeToken ?? "",
+        window,
+      })
+    );
+  }
 
-  const giteeContributionMap: Record<string, number> = {};
-
-  giteeCells.forEach((cell) => {
-    giteeContributionMap[cell.date] = cell.count;
-  });
-
-  cells.forEach((cell) => {
-    cell.count += giteeContributionMap[cell.date] ?? 0;
-  });
-
-  cells.forEach((cell) => {
-    let level: number = 0;
-
-    if (cell.count > 10) {
-      level = 4; // 表示 "FOURTH_QUARTILE"
-    } else if (cell.count > 6) {
-      level = 3; // 表示 "THIRD_QUARTILE"
-    } else if (cell.count > 3) {
-      level = 2; // 表示 "SECOND_QUARTILE"
-    } else if (cell.count > 0) {
-      level = 1; // 表示 "FIRST_QUARTILE"
-    }
-    // 将计算出的 level 赋值给 cell.level
-    cell.level = level;
-  });
+  const cells = mergeDailyCommitCounts(window, dailySources);
+  const commitsTotal = totalCommitCount(cells);
+  const commitsByCell = commitCountsByCell(cells);
 
   const grid = userContributionToGrid(cells);
   const snake = snake4;
@@ -83,7 +102,12 @@ export const generateContributionSnake = async (
             cells,
             chain,
             drawOptions,
-            animationOptions
+            animationOptions,
+            {
+              totalCommits: commitsTotal,
+              windowDays: window.dates.length,
+              commitsByCell,
+            }
           );
         }
       }
