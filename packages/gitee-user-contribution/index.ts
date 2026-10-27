@@ -15,6 +15,52 @@ type GiteeEvent = {
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 1000;
+const MAX_FETCH_ATTEMPTS = 3;
+
+const describeFetchError = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error);
+
+  const cause = Reflect.get(error, "cause");
+  if (!cause || (typeof cause !== "object" && typeof cause !== "function")) {
+    return `${error.name}: ${error.message}`;
+  }
+
+  const causeMessage = Reflect.get(cause, "message");
+  const causeCode = Reflect.get(cause, "code");
+  return [
+    `${error.name}: ${error.message}`,
+    typeof causeMessage === "string" ? `cause=${causeMessage}` : undefined,
+    typeof causeCode === "string" ? `code=${causeCode}` : undefined,
+  ]
+    .filter(Boolean)
+    .join("; ");
+};
+
+const fetchGiteeEvents = async (
+  url: string,
+  init: RequestInit
+): Promise<Response> => {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      const details = describeFetchError(error);
+      if (attempt === MAX_FETCH_ATTEMPTS) break;
+
+      console.warn(
+        `Gitee events request failed before receiving an HTTP response (attempt ${attempt}/${MAX_FETCH_ATTEMPTS}): ${details}; retrying`
+      );
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    }
+  }
+
+  throw new Error(
+    `Gitee events network request failed after ${MAX_FETCH_ATTEMPTS} attempts before receiving an HTTP response: ${describeFetchError(lastError)}. Check GitHub Actions runner connectivity to gitee.com.`
+  );
+};
 
 const getPushCommitCount = (event: GiteeEvent) => {
   if (event.type !== "PushEvent") return 0;
@@ -49,7 +95,7 @@ export const getGiteeUserContribution = async (
       headers.Authorization = `Bearer ${options.giteeToken}`;
     }
 
-    const response = await fetch(url.toString(), { headers });
+    const response = await fetchGiteeEvents(url.toString(), { headers });
     if (!response.ok) {
       throw new Error(
         `Gitee events request failed with status ${response.status}`

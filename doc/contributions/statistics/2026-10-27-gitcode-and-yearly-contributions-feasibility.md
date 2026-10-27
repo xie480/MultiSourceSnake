@@ -88,14 +88,26 @@ GIF 每一帧在画布顶部留白区显示 `Last 365 days: N commits | Eaten: E
 1. 已确定所有平台统一统计提交数，默认最近 365 个 UTC 自然日；README 图片不提供访客侧年份选择。
 2. 已增加 GitHub、Gitee、GitCode 按日适配器、UTC 日期窗口、跨平台聚合、分页保护和 fixture。
 3. 已将 Action 改为从 fork 自己的 Dockerfile 构建，并让 GIF 显示总提交数和蛇已吃提交数。
-4. Profile README workflow 与图片引用模板已写入项目 README；实际发布标签、Secrets/Variables 配置和 hosted runner 端到端验证仍待执行。
+4. Profile README workflow 与图片引用模板已写入项目 README。GitHub-hosted runner 已进行首次 smoke run，但 Gitee 请求失败；实际原因待新增网络诊断日志确认。
 
 ## 8. 当前验证状态
 
 - Jest：排除依赖原生 `canvas.node` 的 `packages/gif-creator/__tests__/createGif.spec.ts` 后，18 个测试套件、85 个测试通过。
-- `yarn type` 通过；在 `packages/action` 下执行 `yarn build`，ncc Action bundle 构建通过。
+- 本次诊断改动后，`corepack yarn type` 通过；`corepack yarn --cwd packages/action build` 的 ncc Action bundle 构建通过。根脚本 `corepack yarn build:action` 在 PowerShell 中因脚本使用 Unix 风格 `( cd ... ; ... )` 语法而提前失败，因此改为直接构建 Action 子包。
+- 本次没有重跑 Jest；此前功能实现阶段的 Jest 结果见原验证记录。
 - 完整 GIF 集成测试受本机环境阻塞：Windows Node 22 预编译下载遇到 TLS 连接中断，node-gyp 回退后因机器没有 Visual Studio C++ Build Tools 而失败。Docker 镜像构建因 Docker Desktop Linux Engine 未启动，无法连接 daemon。
-- 未使用真实 GitHub/Gitee/GitCode token 调用外部 API；目标账号上的分页、权限和数据覆盖仍待 smoke test。
+- GitHub-hosted runner 日志显示 GitHub 数据阶段后进入 Gitee 阶段；Gitee `fetch` 未收到 HTTP 响应并报 `fetch failed`，Action 因 fail-fast 尚未执行 GitCode 阶段。
+- 这次日志没有暴露 Node.js `fetch` 的嵌套网络错误，因此当前不能判定为 DNS、TLS、连接超时/重置，也不能据此归因于 token。目标账号上的分页、权限和数据覆盖仍待成功 smoke test。
+
+### 8.1 GitHub Actions 中 Gitee `fetch failed` 的诊断改进
+
+**现象：** 用户在 GitHub-hosted runner 上看到 `fetching GitHub commit contributions`、`fetching Gitee push contributions`，随后失败为 `Action failed with "fetch failed"`。Gitee 适配器当时直接调用 Node.js 全局 `fetch`；Action 顶层只输出异常的 `message`，没有输出 `cause` 中的底层网络代码。
+
+**判断边界：** `fetch failed` 表示没有拿到 `Response`，所以不像 HTTP 401/403 一样能直接证明认证失败。日志不足以确认实际根因；GitHub 阶段已完成并进入 Gitee 阶段，GitCode 阶段未运行。
+
+**改动：** Gitee 网络请求增加最多三次尝试，间隔 1 秒、2 秒；仅在 `fetch` 抛出网络异常时重试。最终错误打印嵌套 `cause` message/code 和“未收到 HTTP 响应”的上下文，不打印 token 或完整 URL。HTTP 非 2xx 仍由原来的状态码错误路径处理。任何配置的数据源失败仍使整个 Action 失败，避免将不完整的多平台总数发布到 README。
+
+**验证与后续：** TypeScript 检查和 Action bundle 构建通过，但尚未把该修订部署到 GitHub-hosted runner。将修订推送到 `yilena/gitcode-yearly-snake` 并重跑 workflow 后，只有新日志中出现具体 cause/code，才能继续区分 GitHub runner 到 `gitee.com` 的网络问题和其他因素；当前根因与真实 Gitee 数据完整性仍待确认。
 
 ## 9. 主流落地模式调研
 

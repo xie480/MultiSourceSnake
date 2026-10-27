@@ -131,6 +131,10 @@ The path is relative to the profile repository root. The README image is refresh
 - A commit mirrored to more than one platform may be counted more than once; the total is a platform sum, not a cross-platform deduplicated count.
 - GitHub’s built-in `GITHUB_TOKEN` may not include private contributions. Use a token with `read:user` when those counts are enabled on your profile.
 
+## Troubleshooting Gitee network errors
+
+If the log ends with `fetch failed` while fetching Gitee, the request did not receive an HTTP response. This is different from an HTTP status such as `401` or `403`; the log alone cannot identify whether the runner encountered DNS, TLS, timeout, or connection-reset trouble. The action retries network-level failures up to three times and prints the nested network cause and error code when available. The request URL and token are not printed. If all retries fail, inspect the cause code in the final error; an HTTP status instead points to the API response and should be diagnosed separately.
+
 ## Development
 
 ```sh
