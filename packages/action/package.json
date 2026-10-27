@@ -8,7 +8,8 @@
     "@snk/solver": "1.0.0",
     "@snk/svg-creator": "1.0.0",
     "@snk/types": "1.0.0",
-    "@snk/gitee-user-contribution": "1.0.0"
+    "@snk/gitee-user-contribution": "1.0.0",
+    "@snk/gitcode-user-contribution": "1.0.0"
   },
   "devDependencies": {
     "@vercel/ncc": "0.38.0",
